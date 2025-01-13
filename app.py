@@ -27,13 +27,15 @@ sam = EfficientViTSamPredictor(
 BOUNDING_BOX_ANNOTATOR = sv.BoundingBoxAnnotator()
 MASK_ANNOTATOR = sv.MaskAnnotator()
 LABEL_ANNOTATOR = sv.LabelAnnotator()
-
+DEFAULT_QUERY = "sofa, couch, armchair, dining chair, office chair, stool, ottoman, bench, rocking chair, bean bag, recliner, coffee table, dining table, side table, end table, console table, desk, nightstand, tv stand, vanity table, bookshelf, bookcase, cabinet, dresser, wardrobe, closet, chest of drawers, display cabinet, media center, storage bench, sideboard, buffet, bed frame, headboard, footboard, mattress, daybed, futon, floor lamp, table lamp, ceiling light, chandelier, wall sconce, pendant light, track lighting, reading light, painting, cushion, flowers, book, mirror, carpet"
+DEFAULT_CONFIDENCE_THRESHOLD = 0.05
+DEFAULT_NMS_THRESHOLD = 1
 
 def detect(
     image: np.ndarray,
-    query: str,
-    confidence_threshold: float,
-    nms_threshold: float,
+    query: str = DEFAULT_QUERY,
+    confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD,
+    nms_threshold: float = DEFAULT_NMS_THRESHOLD,
 ) -> np.ndarray:
     # Preparation.
     categories = [category.strip() for category in query.split(",")]
