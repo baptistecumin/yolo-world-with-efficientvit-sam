@@ -12,7 +12,7 @@ app = modal.App("gradio-app-vit")
 
 dotenv.load_dotenv(override=True)
 
-def download_efficientvit_model(dest_path: str = '/root/yolo-world-with-efficientvit-sam/'):
+def download_efficientvit_model(dest_path: str = '/root/'):
     """Download EfficientViT SAM model if not present."""
     EFFICIENTVIT_SAM_URL = "https://huggingface.co/mit-han-lab/efficientvit-sam/resolve/main"
     MODEL_FILE = "efficientvit_sam_xl1.pt"
@@ -30,122 +30,185 @@ def download_efficientvit_model(dest_path: str = '/root/yolo-world-with-efficien
     
     return model_path
 
+def clone_clipaway_repo():
+    import os
+    os.system("git clone https://github.com/YigitEkin/CLIPAway.git")
+    os.system("git clone https://github.com/SunzeY/AlphaCLIP.git")
+    
+def download_checkpoints():
+    import os
+    import subprocess
+    # Import all the stable diffusion models we will use later.
+    from diffusers import StableDiffusionInpaintPipeline
+    import torch
+    
+    pipeline = StableDiffusionInpaintPipeline.from_pretrained(
+        "botp/stable-diffusion-v1-5-inpainting",
+        safety_checker=None,
+        torch_dtype=torch.float32
+    )
+    # Cache to a directory that persists in the image
+    pipeline.save_pretrained("/root/sd_models/stable-diffusion-v1-5-inpainting")
+    
+    pipeline = StableDiffusionInpaintPipeline.from_pretrained(
+        "stabilityai/stable-diffusion-2-inpainting",
+        safety_checker=None,
+        torch_dtype=torch.float32
+    )
+    pipeline.save_pretrained("/root/sd_models/stable-diffusion-2-inpainting")
+    
+    # Create directory structure
+    os.makedirs("/root/ckpts/AlphaCLIP", exist_ok=True)
+    os.makedirs("/root/ckpts/IPAdapter/image_encoder", exist_ok=True)
+    os.makedirs("/root/ckpts/CLIPAway", exist_ok=True)
+    
+    print("Downloading Alpha-CLIP weights...")
+    subprocess.run(["gdown", "1JfzOTvjf0tqBtKWwpBJtjYxdHi-06dbk"], 
+                  cwd="/root/ckpts/AlphaCLIP")
+    
+    print("Downloading IP-Adapter weights...")
+    ip_adapter_files = {
+        "ip-adapter_sd15.bin": "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15.bin",
+        "image_encoder/pytorch_model.bin": "https://huggingface.co/h94/IP-Adapter/resolve/main/models/image_encoder/pytorch_model.bin",
+        "image_encoder/config.json": "https://huggingface.co/h94/IP-Adapter/resolve/main/models/image_encoder/config.json"
+    }
+    for filename, url in ip_adapter_files.items():
+        output_path = os.path.join("/root/ckpts/IPAdapter", filename)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        subprocess.run(["wget", "-O", output_path, url])
+    
+    print("Downloading CLIPAway weights...")
+    subprocess.run(["gdown", "1lFHAT2dF5GVRJLxkF1039D53gixHXaTx"],
+                  cwd="/root/ckpts/CLIPAway")
+    
+    print("Finished downloading pretrained models.")
+
 image = (
-    modal.Image.debian_slim(python_version="3.10")
-    .apt_install("git", "python3-opencv", "libgl1-mesa-glx")
+    modal.Image.micromamba(python_version="3.10")
+    .apt_install("git", "python3-opencv", "libgl1-mesa-glx", 
+        "git", "wget", "curl", "build-essential", "libglib2.0-0", "libsm6", "fonts-open-sans",
+        "libxext6", "libxrender-dev", "libgl1-mesa-glx", "libffi-dev",
+        "libssl-dev", "libbz2-dev", "libreadline-dev", "libsqlite3-dev",
+        "libncurses5-dev", "libgomp1", "libuuid1", "ca-certificates",
+        "libstdc++6", "libgcc1", "libopenblas-dev", "git-lfs"
+    )
+    .micromamba_install(
+        [
+            "_libgcc_mutex=0.1=main",
+            "_openmp_mutex=5.1=1_gnu",
+            "bzip2=1.0.8",
+            "ca-certificates",
+            "ld_impl_linux-64",
+            "libffi",
+            "libgcc-ng",
+            "libgomp",
+            "libstdcxx-ng",
+            "libuuid",
+            "ncurses",
+            "openssl",
+            "pip",
+            "readline",
+            "setuptools",
+            "sqlite",
+            "tk",
+            "wheel",
+            "xz",
+            "zlib",
+            "anthropic",
+            "backoff",
+            "python-dotenv",
+        ],
+        channels=["conda-forge", "defaults"]
+    )
     .pip_install(
-        "inference[yolo-world]==0.9.13",
-        "supervision==0.18.0",
-        "fastapi==0.112.4", 
-        "pydantic",
-        "gradio==4.26.0",
-        "timm==0.9.12",
+        "timm",
+        "absl-py",
+        "accelerate==0.28.0",
+        "anthropic",
+        "backoff==2.2.1",  # Keeping explicit version over unversioned
+        "clean-fid",
+        "diffusers==0.29.0",
+        "einops==0.7.0",
+        "fastapi==0.112.4",
+        "ftfy==6.2.0",
+        "gdown==5.1.0",
+        "git+https://github.com/facebookresearch/segment-anything.git",
+        "git+https://github.com/openai/CLIP.git",
+        "git+https://github.com/tencent-ailab/IP-Adapter.git",
+        "google-generativeai==0.8.3",  # Keeping versioned over unversioned
+        "gradio",
+        "inference[yolo-world]",
+        "jsonschema==4.19.1",
+        "loralib",
+        "numpy",
+        "omegaconf==2.3.0",
         "onnx==1.15.0",
         "onnxsim==0.4.35",
-        "backoff==2.2.1",
-        "jsonschema==4.19.1",
-        "google-generativeai==0.8.3",
-        "git+https://github.com/facebookresearch/segment-anything.git",
+        "opencv-python",
+        "pandas",
+        "pillow==10.3.0",
+        "pycparser==2.22",
+        "pydantic",  
+        "regex==2023.12.25",
+        "setuptools==69.5.1",
+        "supervision==0.18.0",
+        "timm==0.9.12",
+        "torch==2.3.0",
+        "torchvision==0.18.0",
+        "tqdm==4.66.2",
+        "traitlets==5.14.3",
+        "transformers==4.39.3"
+    )
+    .run_commands(
+        "git lfs install",
+        "python -m pip install 'git+https://github.com/facebookresearch/detectron2.git'",
+        "mkdir -p /root/third_party",
+        "git clone https://github.com/xingyizhou/CenterNet2.git /root/third_party/CenterNet2",
+        "git clone https://github.com/facebookresearch/Detic.git --recurse-submodules /root/Detic",
+        "cd /root/Detic && pip install -r requirements.txt",
+        "mkdir -p /opt/models",
     )
     .run_function(download_efficientvit_model)
+    .run_function(clone_clipaway_repo)
+    .run_function(download_checkpoints)
     .add_local_file(local_path='./gradio_app.py', remote_path='/root/gradio_app.py')
     .add_local_dir(
         local_path='../yolo-world-with-efficientvit-sam', 
-        remote_path='/root/yolo-world-with-efficientvit-sam'
+        remote_path='/root/'
     )
 )
 
 @app.function(
-    gpu="T4",
+    gpu="A100",
     image=image,
     allow_concurrent_inputs=100,  # Ensure we can handle multiple requests
     concurrency_limit=1,  # Ensure all requests end up on the same container
 )
-@modal.web_server(GRADIO_PORT, startup_timeout=60)
+@modal.web_server(GRADIO_PORT, startup_timeout=120)
 def web_app():
     import os
+    import sys
         
     # Set up environment
-    os.chdir('/root/yolo-world-with-efficientvit-sam')
-    os.environ['PYTHONPATH'] = '/root/yolo-world-with-efficientvit-sam'
-    os.environ['EFFICIENTVIT_SAM_PATH'] = "/root/yolo-world-with-efficientvit-sam/models/xl1.pt"
+    os.chdir('/root/')
+    os.environ['PYTHONPATH'] = os.pathsep.join([
+        os.environ.get('PYTHONPATH', ''),  # Get existing or empty string
+        '/root/',
+        '/root/Detic',
+        '/root/third_party/CenterNet2'
+    ])
+    os.environ['EFFICIENTVIT_SAM_PATH'] = "/root/models/xl1.pt"
+    
+    # Set up CLIPAway
+    sys.path.append("/root/CLIPAway")
+    sys.path.append("/root/AlphaCLIP")
+    sys.path.append("/root/Detic")
+    sys.path.append("/root/third_party/CenterNet2")
+    
+    # print to console all the files in /root/
+    print(f"COMPLETED SETUP. Files in /root/: {os.listdir('/root/')}.")
     
     # Launch the Gradio app
     target = shlex.quote(str('/root/gradio_app.py'))
     cmd = f"python {target} --host 0.0.0.0 --port {GRADIO_PORT}"
     subprocess.Popen(cmd, shell=True)
-
-class GenerateRoomRequest(pydantic.BaseModel):
-    image_base64: str
-    image_url: str
-    
-# @app.cls(
-#     gpu="T4",
-#     image=image,
-#     container_idle_timeout=120,
-#     allow_concurrent_inputs=10,
-#     keep_warm=0,
-#     concurrency_limit=20,
-#     timeout=600
-# )
-# class GenerateMask:
-#     @modal.enter()
-#     def initialize_models(self):
-#         import torch
-#         from inference.models import YOLOWorld
-#         from efficientvit.models.efficientvit.sam import EfficientViTSamPredictor
-#         from efficientvit.sam_model_zoo import create_sam_model
-#         self.yolo_world = YOLOWorld(model_id="yolo_world/l")
-#         device = "cuda" if torch.cuda.is_available() else "cpu"
-#         self.sam = EfficientViTSamPredictor(
-#             create_sam_model(name="xl1", weight_url="xl1.pt").to(device).eval()
-#         )
-
-#     def decode_image(self, image_b64: str):
-#         import base64
-#         import numpy as np
-#         import cv2
-#         """Decode base64 image to numpy array."""
-#         img_data = base64.b64decode(image_b64.split(',')[1] if ',' in image_b64 else image_b64)
-#         nparr = np.frombuffer(img_data, np.uint8)
-#         return cv2.cvtColor(cv2.imdecode(nparr, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
-
-#     def encode_mask(self, mask) -> str:
-#         import base64
-#         import numpy as np
-#         import cv2
-#         """Encode binary mask to base64 PNG."""
-#         _, encoded = cv2.imencode('.png', mask)
-#         return base64.b64encode(encoded).decode('utf-8')
-
-#     @modal.web_endpoint(method="POST")
-#     def detect_furniture(self, request: GenerateRoomRequest):
-#         import supervision as sv
-#         import numpy as np
-#         prompt = "sofa, couch, armchair, dining chair, office chair, stool, ottoman, bench, rocking chair, bean bag, recliner, coffee table, dining table, side table, end table, console table, desk, nightstand, tv stand, vanity table, bookshelf, bookcase, cabinet, dresser, wardrobe, closet, chest of drawers, display cabinet, media center, storage bench, sideboard, buffet, bed frame, headboard, footboard, mattress, daybed, futon, floor lamp, table lamp, ceiling light, chandelier, wall sconce, pendant light, track lighting, reading light, painting, cushion, flowers, book, mirror, carpet, vase, bowl, food"
-        
-#         # Decode input image
-#         image = self.decode_image(request.image_base64)
-        
-#         # Set up detection classes
-#         self.yolo_world.set_classes(request.categories.split(","))
-        
-#         # Run YOLO detection
-#         results = self.yolo_world.infer(image, confidence=request.threshold)
-#         detections = sv.Detections.from_inference(results).with_nms(
-#             class_agnostic=True,
-#             threshold=request.nms_threshold
-#         )
-
-#         # Initialize empty mask
-#         combined_mask = np.zeros(image.shape[:2], dtype=np.uint8)
-        
-#         if len(detections.xyxy) > 0:
-#             # Generate and combine masks
-#             self.sam.set_image(image, image_format="RGB")
-#             for xyxy in detections.xyxy:
-#                 mask, _, _ = self.sam.predict(box=xyxy, multimask_output=False)
-#                 combined_mask |= mask.squeeze().astype(np.uint8) * 255
-
-#         # Return base64 encoded PNG of binary mask
-#         return {"mask": self.encode_mask(combined_mask)}
