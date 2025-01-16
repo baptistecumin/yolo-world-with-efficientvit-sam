@@ -179,6 +179,9 @@ class DeticMask:
             
             # Move to CPU safely
             instances = outputs["instances"]
+            min_area = 10000  # e.g., 100 pixels
+            keep = instances.pred_boxes.area() > min_area
+            instances = instances[keep]
             classes = instances.pred_classes.cpu().numpy()
             class_names = [self.metadata.thing_classes[i] for i in classes]
             if hasattr(instances, 'to') and instances.pred_boxes.tensor.device.type == 'cuda':
